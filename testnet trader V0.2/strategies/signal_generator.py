@@ -7,23 +7,29 @@ from strategies.multi_strategy import MultiStrategyEngine
 from data.data_processor import extract_advanced_features
 from ml.base_ml import predict_with_ml
 from strategies.base_strategy import generate_signals
+from config import TRADE_SETTINGS
 
 # اضافه کردن import برای تحلیل چند تایم‌فریمی
 try:
     from utils.multi_timeframe import confirm_signal_with_timeframes
 
-    MULTI_TIMEFRAME_AVAILABLE = False
+    MULTI_TIMEFRAME_AVAILABLE = True
 except ImportError:
     print("⚠️ تحلیل چند تایم‌فریمی در دسترس نیست")
     MULTI_TIMEFRAME_AVAILABLE = False
 
 
-def enhanced_signal_generation(df, ml_models=None, rl_integration=None):
+def enhanced_signal_generation(
+    df, symbol="BTC/USDT", ml_models=None, rl_integration=None, verbose=True
+):
     """تولید سیگنال پیشرفته با ترکیب تمام استراتژی‌ها"""
     df = df.copy()
-    symbol = getattr(df, "name", "BTC/USDT")
 
-    print(f"\n🔍 تولید سیگنال برای {symbol}...")
+    # Clean up symbol name for display
+    display_symbol = str(symbol).split("/")[0] if "/" in str(symbol) else str(symbol)
+
+    if verbose:
+        print(f"\n🔍 تولید سیگنال برای {display_symbol}...")
 
     # اول سیگنال‌های پایه رو تولید کن تا ستون position ایجاد بشه
     df = generate_signals(df)
@@ -33,14 +39,14 @@ def enhanced_signal_generation(df, ml_models=None, rl_integration=None):
 
     # تشخیص شرایط بازار
     market_regime = strategy_engine.detect_market_regime(df)
-    print(f"📊 شرایط بازار {symbol}: {market_regime}")
+    print(f"📊 شرایط بازار {display_symbol}: {market_regime}")
 
     # سیگنال استراتژی ترکیبی
     strategy_signal, strategy_scores = strategy_engine.calculate_combined_signal(
         df, market_regime
     )
 
-    print(f"🎯 امتیاز استراتژی‌های {symbol}:")
+    print(f"🎯 امتیاز استراتژی‌های {display_symbol}:")
     for strategy, score in strategy_scores.items():
         print(f"   {strategy}: {score:.3f}")
 
@@ -70,33 +76,69 @@ def enhanced_signal_generation(df, ml_models=None, rl_integration=None):
                     )
 
                 print(
-                    f"🤖 سیگنال ML {symbol}: {ml_signal} (اعتماد: {ml_confidence:.3f})"
+                    f"🤖 سیگنال ML {display_symbol}: {ml_signal} (اعتماد: {ml_confidence:.3f})"
                 )
             else:
-                print(f"⚠️ ویژگی‌های کافی برای ML {symbol} موجود نیست")
+                print(f"⚠️ ویژگی‌های کافی برای ML {display_symbol} موجود نیست")
 
         except Exception as e:
-            print(f"⚠️ خطا در پیش‌بینی ML برای {symbol}: {e}")
+            print(f"⚠️ خطا در پیش‌بینی ML برای {display_symbol}: {e}")
 
-    # ترکیب نهایی سیگنال‌ها
+    # ترکیب نهایی سیگنال‌ها با حل تعارض - بهبود یافته برای بازار گاوی
     final_signal = 0
     signal_source = "هیچکدام"
 
-    # منطق ترکیبی بهبود یافته - فقط سیگنال‌های 0 یا 1
-    if ml_signal != 0 and ml_confidence > 0.65:
+    # تشخیص شرایط بازار برای تنظیم آستانه
+    market_regime = strategy_engine.detect_market_regime(df)
+    bullish_bias = market_regime in ["trending_bull", "high_volatility"]
+
+    # امتیاز نهایی برای تصمیم‌گیری
+    ml_strength = ml_confidence if ml_signal != 0 else 0
+    strategy_strength = abs(strategy_signal)
+
+    # آستانه‌های پویا بر اساس شرایط بازار
+    ml_threshold = 0.55 if bullish_bias else 0.6
+    strategy_threshold = 0.2 if bullish_bias else 0.3
+
+    if (
+        ml_signal != 0
+        and strategy_signal != 0
+        and ml_signal != np.sign(strategy_signal)
+    ):
+        # تعارض: مقایسه قدرت سیگنال‌ها
+        if ml_strength > 0.7 and strategy_strength < 0.5:
+            final_signal = ml_signal
+            signal_source = "ML (برنده تعارض)"
+        elif strategy_strength > 0.5 and ml_strength < 0.6:
+            final_signal = 1 if strategy_signal > 0 else -1
+            signal_source = "استراتژی (برنده تعارض)"
+        else:
+            # تعارض شدید: هیچ سیگنال
+            final_signal = 0
+            signal_source = "تعارض - رد سیگنال"
+    elif ml_signal != 0 and ml_strength > ml_threshold:
         final_signal = ml_signal
         signal_source = "ML"
-    elif abs(strategy_signal) > 0.3:  # آستانه متعادل
-        final_signal = 1 if strategy_signal > 0.3 else -1
-        signal_source = "استراتژی"
+    elif strategy_signal != 0 and strategy_strength > strategy_threshold:
+        # بایاس گاوی: ترجیح سیگنال خرید
+        if strategy_signal > 0 or bullish_bias:
+            final_signal = 1 if strategy_signal > 0 else -1
+            signal_source = "استراتژی"
+        else:
+            final_signal = 0
     else:
-        final_signal = 0
-        signal_source = "هیچکدام"
+        # در بازار گاوی، سیگنال خنثی را به خرید ملایم تبدیل کن
+        if bullish_bias and strategy_strength > 0.1:
+            final_signal = 1
+            signal_source = "استراتژی (بایاس گاوی)"
+        else:
+            final_signal = 0
+            signal_source = "هیچکدام"
 
-    print(f"🎯 سیگنال اولیه {symbol}: {final_signal} (منبع: {signal_source})")
+    print(f"🎯 سیگنال اولیه {display_symbol}: {final_signal} (منبع: {signal_source})")
 
     # ==================== تحلیل چند تایم‌فریمی ====================
-    """if MULTI_TIMEFRAME_AVAILABLE and final_signal != 0:
+    if MULTI_TIMEFRAME_AVAILABLE and final_signal != 0 and symbol != "UNKNOWN":
         try:
             confirmed_signal, confirmation_message = confirm_signal_with_timeframes(
                 final_signal, symbol, df
@@ -107,24 +149,31 @@ def enhanced_signal_generation(df, ml_models=None, rl_integration=None):
             if confirmed_signal == 0:
                 final_signal = 0
                 signal_source = "تایید نشد"
-                print(f"❌ سیگنال {symbol} توسط تحلیل چند تایم‌فریمی تایید نشد")
-            elif abs(confirmed_signal) < 1:  # اگر سیگنال ضعیف‌تر شده (مثلاً 0.5)
+                print(f"❌ سیگنال {display_symbol} توسط تحلیل چند تایم‌فریمی تایید نشد")
+            elif abs(confirmed_signal) < 0.8:  # آستانه سخت‌گیرانه‌تر
                 final_signal = 0  # کاملاً حذف کن
                 signal_source = "تایید نشد"
-                print(f"❌ سیگنال {symbol} ضعیف تشخیص داده شد")
+                print(f"❌ سیگنال {display_symbol} ضعیف تشخیص داده شد")
+            else:
+                # اگر قوی‌تر شد، به‌روزرسانی کن
+                final_signal = 1 if confirmed_signal > 0 else -1
+                signal_source += " + چندتایم‌فریمی"
         except Exception as e:
             print(f"⚠️ خطا در تحلیل چند تایم‌فریمی: {e}")
-    """
+    elif symbol == "UNKNOWN":
+        print("⚠️ نماد نامشخص - تحلیل چند تایم‌فریمی رد شد")
     # ==================== پایان بخش جدید ====================
 
-    print(f"🎯 سیگنال نهایی {symbol}: {final_signal} (منبع: {signal_source})")
+    print(f"🎯 سیگنال نهایی {display_symbol}: {final_signal} (منبع: {signal_source})")
 
     # ایجاد position جدید با فیلترهای بهتر
     df["final_signal"] = final_signal
     df["new_position"] = 0
 
     # فیلترهای پیشرفته برای کاهش over-trading
-    min_distance = 5  # حداقل 5 روز بین معاملات
+    min_distance = TRADE_SETTINGS.get(
+        "min_distance_between_trades", 5
+    )  # حداقل فاصله بین معاملات
     last_position_change = -min_distance
 
     for i in range(1, len(df)):
@@ -158,9 +207,12 @@ def enhanced_signal_generation(df, ml_models=None, rl_integration=None):
     buy_positions = len(df[df["position"] == 1])
     sell_positions = len(df[df["position"] == -1])
 
-    print(f"📊 موقعیت‌های واقعی {symbol}: {buy_positions} خرید, {sell_positions} فروش")
+    print(
+        f"📊 موقعیت‌های واقعی {display_symbol}: {buy_positions} خرید, {sell_positions} فروش"
+    )
     print(f"🔄 تعداد تغییرات موقعیت: {position_changes}")
 
+    df.name = symbol
     return df
 
 

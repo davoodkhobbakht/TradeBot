@@ -4,19 +4,19 @@
 # پارامترهای بهینه‌شده برای هر نماد
 SYMBOL_OPTIMIZED_PARAMS = {
     "BTC/USDT": {
-        "stop_loss": 0.06,
-        "take_profit": 0.25,
-        "position_size": 0.12,
+        "stop_loss": 0.015,  # 1.5% - wider for bull markets
+        "take_profit": 0.10,  # 10% - more aggressive TP
+        "position_size": 0.10,  # 10% - larger position for better returns
     },
     "ETH/USDT": {
-        "stop_loss": 0.07,
-        "take_profit": 0.22,
-        "position_size": 0.12,
+        "stop_loss": 0.02,  # 2%
+        "take_profit": 0.12,  # 12%
+        "position_size": 0.08,  # 8%
     },
     "SOL/USDT": {
-        "stop_loss": 0.10,
-        "take_profit": 0.30,
-        "position_size": 0.08,
+        "stop_loss": 0.025,  # 2.5% - adjusted for volatility
+        "take_profit": 0.15,  # 15%
+        "position_size": 0.08,  # 8%
     },
 }
 
@@ -24,8 +24,10 @@ SYMBOL_OPTIMIZED_PARAMS = {
 TRADE_SETTINGS = {
     "initial_capital": 1000.0,
     "trade_fee": 0.001,
-    "slippage": 0.002,
-    "max_trades_per_symbol": 50,
+    "slippage": 0.005,  # Increased from 0.002 for more realistic crypto slippage
+    "bid_ask_spread": 0.0005,  # Added bid-ask spread for realism
+    "max_trades_per_symbol": 20,
+    "min_distance_between_trades": 30,  # Minimum candles between trades to align with max_trades limit
 }
 
 # تنظیمات ML - بهبود یافته

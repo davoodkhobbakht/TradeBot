@@ -190,11 +190,9 @@ class MLModelManager:
             X_train_scaled = scaler.fit_transform(X_train)
             X_test_scaled = scaler.transform(X_test)
 
-            # SMOTE برای مقابله با عدم تعادل داده‌ها
-            smote = SMOTE(random_state=42)
-            X_train_resampled, y_train_resampled = smote.fit_resample(
-                X_train_scaled, y_train
-            )
+            # For time-series data, avoid SMOTE as it creates synthetic samples that can leak temporal information
+            X_train_resampled = X_train_scaled
+            y_train_resampled = y_train
 
             # مدل LSTM
             X_train_lstm = X_train_resampled.reshape(
@@ -207,14 +205,13 @@ class MLModelManager:
             model = Sequential(
                 [
                     LSTM(
-                        32,
-                        return_sequences=True,
+                        16,
+                        return_sequences=False,
                         input_shape=(X_train_lstm.shape[1], X_train_lstm.shape[2]),
                     ),
-                    Dropout(0.2),
-                    LSTM(16, return_sequences=False),
-                    Dropout(0.2),
-                    Dense(8, activation="relu"),
+                    Dropout(0.3),
+                    Dense(4, activation="relu"),
+                    Dropout(0.3),
                     Dense(1, activation="sigmoid"),
                 ]
             )
@@ -253,22 +250,35 @@ def predict_with_ml(model, scaler, feature_columns, df_current, model_type="kera
     """پیش‌بینی با مدل ML روی داده‌های جاری"""
     available_features = [f for f in feature_columns if f in df_current.columns]
 
-    if len(available_features) != len(feature_columns):
+    if len(available_features) < len(feature_columns) * 0.7:
         missing_features = [f for f in feature_columns if f not in df_current.columns]
         print(f"⚠️ ویژگی‌های غایب: {len(missing_features)} از {len(feature_columns)}")
         return 0.5
 
     X_current = df_current[available_features].iloc[[-1]]
 
+    # Handle NaN values in the current data
+    if X_current.isna().any().any():
+        print("⚠️ داده‌های جاری شامل مقادیر NaN هستند")
+        return 0.5
+
     if scaler is not None:
-        X_scaled = scaler.transform(X_current)
+        try:
+            X_scaled = scaler.transform(X_current)
+        except Exception as e:
+            print(f"⚠️ خطا در استانداردسازی داده‌ها: {e}")
+            return 0.5
     else:
         X_scaled = X_current.values
 
-    if model_type == "keras":
-        X_lstm = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
-        probability = model.predict(X_lstm)[0][0]
-    else:  # sklearn models
-        probability = model.predict_proba(X_scaled)[0][1]
+    try:
+        if model_type == "keras":
+            X_lstm = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
+            probability = model.predict(X_lstm, verbose=0)[0][0]
+        else:  # sklearn models
+            probability = model.predict_proba(X_scaled)[0][1]
 
-    return probability
+        return probability
+    except Exception as e:
+        print(f"⚠️ خطا در پیش‌بینی مدل: {e}")
+        return 0.5

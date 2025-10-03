@@ -33,6 +33,7 @@ def run_backtest(df, initial_capital=1000.0):
 
     trade_fee = TRADE_SETTINGS["trade_fee"]
     slippage = TRADE_SETTINGS["slippage"]
+    bid_ask_spread = TRADE_SETTINGS.get("bid_ask_spread", 0.0)
     max_trades = TRADE_SETTINGS["max_trades_per_symbol"]
 
     print(
@@ -46,9 +47,12 @@ def run_backtest(df, initial_capital=1000.0):
     trade_count = 0
 
     for i in range(start_idx, len(df)):
-        current_price = df["close"].iloc[i] * (
-            1 + slippage if in_position else 1 - slippage
-        )
+        # Apply slippage and bid-ask spread realistically
+        base_price = df["close"].iloc[i]
+        if in_position:  # Selling/exiting long position
+            current_price = base_price * (1 - slippage - bid_ask_spread / 2)
+        else:  # Buying/entering
+            current_price = base_price * (1 + slippage + bid_ask_spread / 2)
         current_date = df.index[i]
         volatility = df["BB_Bandwidth"].iloc[i] if i < len(df) else 0.02
 

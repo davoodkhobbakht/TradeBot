@@ -1,124 +1,151 @@
 # -*- coding: utf-8 -*-
-# ml/simple_ml.py
+# ml/simple_ml.py - FIXED VERSION
 
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from data.data_processor import extract_advanced_features
+from sklearn.metrics import accuracy_score, f1_score, classification_report
+from data.data_processor import create_ml_features, prepare_train_test_split
 
 
 class SimpleMLTrainer:
-    """آموزش مدل‌های ML ساده و مؤثر"""
+    """آموزش مدل‌های ML ساده و صحیح"""
 
     def __init__(self):
         self.models = {}
 
-    def create_simple_features(self, df):
-        """ایجاد ویژگی‌های ساده و مؤثر"""
-        df = df.copy()
-
-        # ویژگی‌های اصلی
-        features = [
-            "RSI",
-            "MACD",
-            "ADX",
-            "BB_Bandwidth",
-            "volatility_ratio",
-            "volume_spike",
-            "SMA_20",
-            "SMA_50",
-            "close",
-        ]
-
-        # نسبت‌های قیمت
-        df["price_vs_sma20"] = df["close"] / df["SMA_20"]
-        df["price_vs_sma50"] = df["close"] / df["SMA_50"]
-        df["sma_ratio"] = df["SMA_20"] / df["SMA_50"]
-
-        # مومنتوم
-        df["momentum_5"] = df["close"].pct_change(5)
-        df["momentum_10"] = df["close"].pct_change(10)
-
-        return df
-
     def train_simple_model(self, df, symbol):
-        """آموزش یک مدل ساده و مؤثر"""
+        """آموزش مدل بدون Data Leakage"""
 
-        # ایجاد ویژگی‌ها
-        df_enhanced = self.create_simple_features(df)
+        print(f"\n{'='*60}")
+        print(f"🎯 آموزش مدل برای {symbol}")
+        print(f"{'='*60}")
 
-        # تارگت: آیا قیمت در 3 روز آینده 2% افزایش می‌یابد؟
-        future_return = df_enhanced["close"].shift(-3) / df_enhanced["close"] - 1
-        target = (future_return > 0.02).astype(int)
+        # ایجاد features و target (بدون leakage)
+        df_features, feature_columns = create_ml_features(df)
 
-        # ویژگی‌های نهایی
-        feature_columns = [
-            "RSI",
-            "MACD",
-            "ADX",
-            "BB_Bandwidth",
-            "volatility_ratio",
-            "price_vs_sma20",
-            "price_vs_sma50",
-            "sma_ratio",
-            "momentum_5",
-        ]
-
-        # اطمینان از وجود تمام ویژگی‌ها
-        available_features = [f for f in feature_columns if f in df_enhanced.columns]
-        X = df_enhanced[available_features]
-        y = target
-
-        # حذف مقادیر NaN
-        valid_mask = ~(X.isna().any(axis=1) | y.isna())
-        X = X[valid_mask]
-        y = y[valid_mask]
-
-        if len(X) < 100:
-            print(f"⚠️ داده کافی برای {symbol} وجود ندارد")
+        if len(df_features) < 200:
+            print(f"⚠️ داده ناکافی برای {symbol}: {len(df_features)} نمونه")
             return None, None, None
 
-        # تقسیم داده
-        split_idx = int(len(X) * 0.8)
-        X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
-        y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+        # بررسی تعادل کلاس‌ها
+        target_counts = df_features["target"].value_counts()
+        total = len(df_features)
 
-        print(f"📊 آموزش مدل ساده برای {symbol}: {len(X_train)} نمونه آموزش")
+        print(f"\n📊 توزیع اولیه کلاس‌ها:")
+        for cls in [-1, 0, 1]:
+            count = target_counts.get(cls, 0)
+            pct = count / total * 100
+            class_name = {-1: "Sell", 0: "Hold", 1: "Buy"}[cls]
+            print(f"   {class_name}: {count} ({pct:.1f}%)")
 
-        # مدل
-        model = RandomForestClassifier(
-            n_estimators=50, max_depth=8, min_samples_split=20, random_state=42
+        # اگر کلاس‌های Buy/Sell خیلی کم هستند، از binary target استفاده کن
+        buy_count = target_counts.get(1, 0)
+        sell_count = target_counts.get(-1, 0)
+
+        if buy_count < 30 or sell_count < 30:
+            print(f"⚠️ کلاس‌های Buy/Sell کم هستند. تبدیل به binary...")
+            # فقط Buy (1) و Not Buy (0) رو در نظر بگیر
+            df_features["target"] = (df_features["target"] == 1).astype(int)
+
+        # Split بدون leakage
+        X_train, X_test, y_train, y_test, scaler = prepare_train_test_split(
+            df_features, feature_columns, test_size=0.3
         )
 
+        # بررسی توزیع در train/test
+        print(f"\n📊 توزیع Train: {y_train.value_counts().to_dict()}")
+        print(f"📊 توزیع Test: {y_test.value_counts().to_dict()}")
+
+        # مدل ساده
+        print(f"\n🤖 آموزش Random Forest...")
+        model = RandomForestClassifier(
+            n_estimators=100,
+            max_depth=8,
+            min_samples_split=20,
+            min_samples_leaf=10,
+            max_features="sqrt",
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        )
+
+        # آموزش
         model.fit(X_train, y_train)
 
         # ارزیابی
-        y_pred = model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
+        y_train_pred = model.predict(X_train)
+        y_test_pred = model.predict(X_test)
 
-        print(f"✅ مدل ساده {symbol}: دقت = {accuracy:.3f}")
+        train_acc = accuracy_score(y_train, y_train_pred)
+        test_acc = accuracy_score(y_test, y_test_pred)
 
-        if accuracy > 0.55:  # بهتر از تصادفی
-            return model, None, available_features
+        train_f1 = f1_score(y_train, y_train_pred, average="weighted")
+        test_f1 = f1_score(y_test, y_test_pred, average="weighted")
+
+        print(f"\n📈 نتایج:")
+        print(f"   Train Accuracy: {train_acc:.3f}")
+        print(f"   Test Accuracy: {test_acc:.3f}")
+        print(f"   Train F1: {train_f1:.3f}")
+        print(f"   Test F1: {test_f1:.3f}")
+
+        # بررسی overfitting
+        overfit_gap = train_acc - test_acc
+        if overfit_gap > 0.15:
+            print(f"⚠️ احتمال Overfitting: Gap = {overfit_gap:.3f}")
+
+        # نمایش Classification Report
+        print(f"\n📊 Classification Report (Test):")
+        print(classification_report(y_test, y_test_pred))
+
+        # Feature Importance
+        feature_importance = pd.DataFrame(
+            {"feature": feature_columns, "importance": model.feature_importances_}
+        ).sort_values("importance", ascending=False)
+
+        print(f"\n🔝 Top 5 Features:")
+        for idx, row in feature_importance.head(5).iterrows():
+            print(f"   {row['feature']}: {row['importance']:.4f}")
+
+        # قبول مدل اگر:
+        # 1. Test accuracy بهتر از baseline (0.5 برای binary, 0.33 برای 3-class)
+        # 2. Test F1 معقول باشه
+        # 3. Overfitting زیاد نباشه
+
+        baseline = 0.5 if len(y_test.unique()) == 2 else 0.33
+
+        if test_acc > baseline + 0.05 and test_f1 > 0.4 and overfit_gap < 0.20:
+            print(f"\n✅ مدل قابل قبول است")
+            return model, scaler, feature_columns
         else:
+            print(f"\n❌ مدل قابل قبول نیست:")
+            if test_acc <= baseline + 0.05:
+                print(
+                    f"   - Test Accuracy پایین: {test_acc:.3f} vs baseline {baseline:.3f}"
+                )
+            if test_f1 <= 0.4:
+                print(f"   - Test F1 پایین: {test_f1:.3f}")
+            if overfit_gap >= 0.20:
+                print(f"   - Overfitting زیاد: {overfit_gap:.3f}")
             return None, None, None
 
     def train_all_models(self, symbols_data):
-        """آموزش مدل برای تمام نمادها"""
+        """آموزش مدل برای همه symbols"""
         successful_models = 0
 
         for symbol, df in symbols_data.items():
-            if len(df) > 200:
-                print(f"🎯 آموزش مدل ساده برای {symbol}...")
+            if len(df) > 300:
                 model, scaler, features = self.train_simple_model(df, symbol)
 
                 if model is not None:
                     self.models[symbol] = (model, scaler, features, "sklearn")
                     successful_models += 1
-                    print(f"✅ مدل ساده {symbol} آموزش داده شد")
+                    print(f"\n✅ مدل {symbol} با موفقیت آموزش داده شد\n")
                 else:
-                    print(f"❌ آموزش مدل ساده {symbol} ناموفق بود")
+                    print(f"\n❌ مدل {symbol} رد شد\n")
 
-        print(f"\n🎉 آموزش کامل: {successful_models} مدل ساده آموزش داده شدند")
+        print(f"\n{'='*60}")
+        print(f"🎉 آموزش کامل: {successful_models}/{len(symbols_data)} مدل موفق")
+        print(f"{'='*60}\n")
+
         return self.models

@@ -5,6 +5,7 @@ import argparse
 import time
 import sys
 import os
+import numpy as np
 
 # اضافه کردن مسیر پوشه‌ها به sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), "data"))
@@ -123,7 +124,7 @@ def enhanced_backtest(symbols, ml_models=None, initial_capital=1000.0):
 
         # تولید سیگنال پیشرفته
         print("🔍 تولید سیگنال‌های پیشرفته...")
-        df = enhanced_signal_generation(df, ml_models, None)
+        df = enhanced_signal_generation(df, symbol, ml_models, None)
 
         # اجرای بک‌تست
         print("⚡ اجرای بک‌تست...")
@@ -155,6 +156,54 @@ def enhanced_backtest(symbols, ml_models=None, initial_capital=1000.0):
     return results
 
 
+def validate_models(symbols, ml_models, initial_capital=1000.0):
+    """اعتبارسنجی مدل‌ها با روش‌های پیشرفته"""
+    print("🔬 شروع اعتبارسنجی مدل‌ها...")
+
+    from backtest.validation import validate_strategy
+
+    results = validate_strategy(symbols, ml_models, initial_capital)
+    print_validation_results(results)
+    return results
+
+
+def print_validation_results(results):
+    """چاپ نتایج اعتبارسنجی"""
+    if not results:
+        print("❌ هیچ نتیجه اعتبارسنجی وجود ندارد!")
+        return
+
+    print(f"\n🎯 نتایج اعتبارسنجی مدل‌ها:")
+    print(f"{'='*80}")
+
+    for symbol, validations in results.items():
+        print(f"\n📊 {symbol}:")
+
+        if "out_of_sample" in validations:
+            oos = validations["out_of_sample"]
+            print(f"  📈 Out-of-Sample:")
+            print(
+                f"     Strategy: {oos['strategy_return']:+.2f}% | Buy&Hold: {oos['buy_hold_return']:+.2f}%"
+            )
+            print(
+                f"     Outperformance: {oos['outperformance']:+.2f}% | Max DD: {oos['max_drawdown']:.2f}%"
+            )
+
+        if "walk_forward" in validations:
+            wf_results = validations["walk_forward"]
+            avg_return = np.mean([r["total_return"] for r in wf_results])
+            print(f"  🔄 Walk-Forward: Average Return {avg_return:+.2f}%")
+
+        if "monte_carlo" in validations:
+            mc = validations["monte_carlo"]
+            print(f"  🎲 Monte Carlo:")
+            print(
+                f"     Mean: {mc['mean_return']:+.2f}% | Std: {mc['std_return']:.2f}% | VaR 95%: {mc['var_95']:+.2f}%"
+            )
+            if "successful_simulations" in mc:
+                print(f"     Successful Simulations: {mc['successful_simulations']}")
+
+
 def main():
     """تابع اصلی اجرای برنامه"""
     parser = argparse.ArgumentParser()
@@ -164,6 +213,9 @@ def main():
         "--enhanced", action="store_true", help="Run enhanced backtest with ML"
     )
     parser.add_argument("--live", action="store_true", help="Run in live testnet mode")
+    parser.add_argument(
+        "--validate", action="store_true", help="Run comprehensive validation"
+    )
     parser.add_argument("--api_key", type=str, help="Binance API Key for live")
     parser.add_argument("--api_secret", type=str, help="Binance API Secret for live")
     args = parser.parse_args()
@@ -199,6 +251,22 @@ def main():
         print_enhanced_results(results, initial_capital)
         return
 
+    if args.validate:
+        # بارگذاری مدل‌های ML
+        ml_manager = MLModelManager()
+        models_loaded = ml_manager.load_models()
+
+        if not models_loaded:
+            print("❌ مدل‌های ML یافت نشد. ابتدا مدل‌ها را آموزش دهید:")
+            print("   python main.py --train")
+            return
+
+        # اجرای اعتبارسنجی
+        validation_results = validate_models(
+            symbols, ml_manager.models, initial_capital
+        )
+        return
+
     # مدیریت مدل‌های ML
     ml_manager = MLModelManager()
 
@@ -222,6 +290,7 @@ def main():
         print("   python main.py --simple        # تست ساده سیستم")
         print("   python main.py --train         # آموزش مدل‌های ML")
         print("   python main.py --enhanced      # بک‌تست پیشرفته با ML")
+        print("   python main.py --validate      # اعتبارسنجی مدل‌ها")
         print("   python main.py --live          # حالت لایو (نیاز به API)")
 
 
