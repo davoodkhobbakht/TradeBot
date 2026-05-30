@@ -112,7 +112,7 @@ def confirm_signal_with_timeframes(signal, symbol, current_df):
     confirmation_ratio = confirmations / total_timeframes
 
     # فقط سیگنال‌های کاملاً تایید شده
-    if confirmation_ratio >= 0.7:  # 70% تایید
+    if confirmation_ratio >= 0.5:
         return signal, f"تایید شد ({confirmations}/{total_timeframes})"
     else:
         return 0, f"تایید نشد ({confirmations}/{total_timeframes})"

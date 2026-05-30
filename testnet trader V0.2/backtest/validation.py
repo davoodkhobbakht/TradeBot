@@ -3,10 +3,17 @@
 
 import pandas as pd
 import numpy as np
-from backtester import run_backtest
-from performance import analyze_performance
+from backtest.backtester import run_backtest
+from backtest.performance import analyze_performance
 from config import TRADE_SETTINGS
 from strategies.signal_generator import enhanced_signal_generation
+import logging
+
+# تنظیم لاگینگ برای ارور هندلینگ
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def walk_forward_validation(
@@ -72,13 +79,15 @@ def out_of_sample_validation(
     symbol, ml_models, train_end_date="2023-01-01", initial_capital=1000.0
 ):
     """Out-of-sample validation"""
-    from data.data_fetcher import fetch_historical_data
+    from data.data_fetcher import DataFetcher
 
     print(f"📊 شروع Out-of-Sample Validation برای {symbol}...")
 
     try:
         # Fetch data up to recent
-        df = fetch_historical_data(symbol, start_date="2020-01-01T00:00:00Z")
+
+        fetcher = DataFetcher()
+        df = fetcher.get_stored_data(symbol, "1d")
 
         if df.empty or len(df) < 200:
             print(f"⚠️ داده کافی برای {symbol} وجود ندارد")
@@ -246,9 +255,14 @@ def validate_strategy(symbols, ml_models, initial_capital=1000.0):
                 print(f"   Number of Trades: {oos_result['num_trades']}")
 
             # Walk-forward validation (sample)
-            from data.data_fetcher import fetch_historical_data
+            from data.data_fetcher import DataFetcher
 
-            df = fetch_historical_data(symbol, start_date="2020-01-01T00:00:00Z")
+            # In functions:
+            fetcher = DataFetcher()
+            df = fetcher.get_stored_data(symbol, "1d")
+            if df.empty:
+                logger.warning(f"⚠️ No data for {symbol}")
+                return None
             if not df.empty and len(df) > 500:
                 wf_results = walk_forward_validation(
                     df, ml_models, symbol, initial_capital=initial_capital
