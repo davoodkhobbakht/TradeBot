@@ -3,3 +3,9 @@
 /Archive.zip
 /testnet trader V0.2.zip
 /venv
+/.venv-3.11
+*.pyc
+
+*.joblib
+*.pkl
+*.keras
