@@ -2,55 +2,45 @@ import subprocess
 import os
 import signal
 import platform
+import sys
 
 class BotManager:
     def __init__(self):
         self.process = None
 
-        # 🔥 FIX: always resolve project root safely
         self.base_dir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..")
-        )
+    os.path.join(os.path.dirname(__file__), "..")
+)
 
-        # ⚠️ your actual bot folder (relative to project root)
-        self.bot_dir = os.path.join(self.base_dir, "testnet trader V0.2")
-
-        self.entry_file = "main.py"
+        self.entry_file = os.path.join(self.base_dir, "main.py")
 
     def start(self, args=None):
         if self.process and self.process.poll() is None:
             return {"status": "already_running"}
 
-        if not os.path.exists(self.bot_dir):
-            return {
-                "status": "error",
-                "message": f"Bot folder not found: {self.bot_dir}"
-            }
+        if not os.path.exists(self.base_dir):
+            return {"status": "error", "message": f"Bot folder not found: {self.base_dir}"}
 
-        cmd = ["python", self.entry_file]
+        cmd = [sys.executable, self.entry_file]  # Use sys.executable for reliability
 
         if args:
-            cmd += args
+            cmd.extend(args)  
         else:
-            cmd += ["--live"]
+            cmd.append("--live")  # Default to live mode
 
         print("🚀 Running:", cmd)
-        print("📂 CWD:", self.bot_dir)
+        print("📂 CWD:", self.base_dir)
 
         self.process = subprocess.Popen(
             cmd,
-            cwd=self.bot_dir,
+            cwd=self.base_dir,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            stderr=subprocess.STDOUT,  # Merge stderr→stdout for log streaming
+            text=True,
+            bufsize=1  
         )
 
-        return {
-            "status": "started",
-            "pid": self.process.pid,
-            "cwd": self.bot_dir,
-            "cmd": cmd
-        }
+        return {"status": "started", "pid": self.process.pid, "cmd": cmd}
 
     def stop(self):
         if not self.process:
