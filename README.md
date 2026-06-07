@@ -63,7 +63,7 @@ The system is designed for educational and testing purposes on Binance testnet b
 
 2. **Install dependencies:**
    ```bash
-   pip install pandas numpy scikit-learn ccxt
+   pip install pandas numpy scikit-learn ccxt matplotlib shap imblearn tensorflow xgboost
    ```
 
 3. **Verify installation:**
