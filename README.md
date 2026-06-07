@@ -1,247 +1,243 @@
-# Testnet Trader V0.2
+# 🚀 TradeBot Frontend Dashboard
 
-A sophisticated cryptocurrency trading bot designed for Binance testnet, featuring advanced multi-strategy trading, machine learning integration, and comprehensive backtesting capabilities.
+A modern, responsive, and real-time web dashboard for the **TradeBot** cryptocurrency trading system. Built with React, TypeScript, and Tailwind CSS, it provides a seamless interface to monitor, configure, and control your algorithmic trading strategies.
 
-## 🚀 Overview
-
-Testnet Trader V0.2 is an automated trading system that combines traditional technical analysis with machine learning models to generate trading signals. The bot supports multiple cryptocurrencies and includes risk management features like stop-loss and take-profit orders.
-
-The system is designed for educational and testing purposes on Binance testnet before deploying to live markets.
-
-## ✨ Features
-
-### Multi-Strategy Trading Engine
-- **Trend Following**: Identifies and follows market trends using moving averages and ADX
-- **Mean Reversion**: Capitalizes on price deviations from mean levels using Bollinger Bands and RSI
-- **Breakout Trading**: Detects price breakouts from resistance/support levels with volume confirmation
-- **Momentum Trading**: Analyzes price momentum using MACD and Stochastic indicators
-- **Volatility Trading**: Adapts to market volatility conditions using ATR and Bollinger Bandwidth
-
-### Machine Learning Integration
-- Random Forest models for price prediction (3-day forward looking)
-- Feature engineering with technical indicators and price ratios
-- Model training pipeline with cross-validation
-- Confidence-weighted signal combination
-
-### Advanced Signal Generation
-- Market regime detection (trending bull/bear, ranging, high volatility)
-- Strategy weight adjustment based on market conditions
-- Multi-timeframe analysis (optional)
-- Signal filtering to reduce over-trading
-
-### Risk Management
-- Configurable stop-loss and take-profit levels per symbol
-- Position sizing based on volatility and account balance
-- Trailing stops with dynamic adjustments
-- Maximum trades per symbol limits
-
-### Backtesting & Analysis
-- Historical data backtesting with realistic fees and slippage
-- Performance metrics (returns, drawdown, Sharpe ratio)
-- Trade-by-trade analysis
-- Comparative analysis vs. buy-and-hold strategy
-
-### Supported Assets
-- BTC/USDT
-- ETH/USDT
-- SOL/USDT
-
-## 📋 Prerequisites
-
-- Python 3.8 or higher
-- Binance account with testnet API keys (for live testing)
-- Internet connection for data fetching
-
-## 🛠️ Installation
-
-1. **Clone the repository:**
-   ```bash
-   cd /path/to/your/projects
-   git clone <repository-url>
-   cd "testnet trader V0.2"
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pip install pandas numpy scikit-learn ccxt matplotlib shap imblearn tensorflow xgboost
-   ```
-
-3. **Verify installation:**
-   ```bash
-   python main.py
-   ```
-
-## ⚙️ Configuration
-
-The bot's behavior can be customized through `config.py`:
-
-### Trade Settings
-```python
-TRADE_SETTINGS = {
-    "initial_capital": 1000.0,      # Starting capital in USDT
-    "trade_fee": 0.001,             # Trading fee (0.1%)
-    "slippage": 0.002,              # Price slippage (0.2%)
-    "max_trades_per_symbol": 50,    # Maximum trades per symbol
-}
-```
-
-### Symbol-Specific Parameters
-```python
-SYMBOL_OPTIMIZED_PARAMS = {
-    "BTC/USDT": {
-        "stop_loss": 0.06,           # 6% stop loss
-        "take_profit": 0.25,         # 25% take profit
-        "position_size": 0.12,       # 12% of capital per trade
-    },
-    # ... other symbols
-}
-```
-
-### ML Settings
-```python
-ML_SETTINGS = {
-    "target_lookahead": 3,           # Predict 3 periods ahead
-    "test_size": 0.3,                # 30% test data
-    "min_positive_samples": 0.15,    # Minimum positive samples
-}
-```
-
-## 🚀 Usage
-
-### Simple System Test
-Run a basic test to verify data fetching and indicators:
-```bash
-python main.py --simple
-```
-
-### Train Machine Learning Models
-Train ML models for each supported symbol:
-```bash
-python main.py --train
-```
-
-### Enhanced Backtesting
-Run comprehensive backtest with ML and multi-strategy signals:
-```bash
-python main.py --enhanced
-```
-
-### Live Testnet Trading
-**⚠️ WARNING: Only use testnet for safety!**
-```bash
-python main.py --live --api_key YOUR_BINANCE_TESTNET_API_KEY --api_secret YOUR_BINANCE_TESTNET_API_SECRET
-```
-
-### Help
-View all available options:
-```bash
-python main.py --help
-```
-
-## 📊 Backtesting
-
-The backtesting engine provides detailed performance analysis:
-
-### Running a Backtest
-1. Ensure historical data is available (automatically fetched)
-2. Run enhanced backtest: `python main.py --enhanced`
-3. Review performance metrics and trade logs
-
-### Performance Metrics
-- **Total Return**: Portfolio percentage gain/loss
-- **Maximum Drawdown**: Largest peak-to-trough decline
-- **Win Rate**: Percentage of profitable trades
-- **Profit Factor**: Gross profit divided by gross loss
-- **Number of Trades**: Total trades executed
-
-### Sample Output
-```
-🎉 نتایج بک‌تست پیشرفته:
-==========================================
-💰 سرمایه اولیه: 1,000 USDT
-💰 سرمایه نهایی: 1,250 USDT
-📈 بازدهی پرتفوی: +25.00%
-🔢 کل معاملات: 45
-
-🏆 رتبه‌بندی نمادها:
-1. 🟢 BTC/USDT: +35.2% (معاملات: 18, Max DD: 12.5%)
-2. 🟢 ETH/USDT: +28.7% (معاملات: 15, Max DD: 15.3%)
-3. 🔴 SOL/USDT: -5.1% (معاملات: 12, Max DD: 22.1%)
-```
-
-## 🏗️ Project Structure
-
-```
-testnet trader V0.2/
-├── main.py                 # Main entry point
-├── config.py              # Configuration settings
-├── data/
-│   ├── data_fetcher.py    # Binance data fetching
-│   ├── data_processor.py  # Feature engineering
-│   └── __init__.py
-├── ml/
-│   ├── base_ml.py         # ML model management
-│   ├── simple_ml.py       # Random Forest trainer
-│   ├── advanced_ml.py     # Advanced ML pipeline
-│   ├── rl_trader.py       # Reinforcement learning
-│   └── __init__.py
-├── strategies/
-│   ├── base_strategy.py   # Basic technical analysis
-│   ├── multi_strategy.py  # Multi-strategy engine
-│   ├── signal_generator.py # Signal combination
-│   ├── gold_strategy.py   # Specialized strategies
-│   └── __init__.py
-├── backtest/
-│   ├── backtester.py      # Backtesting engine
-│   ├── performance.py     # Performance analysis
-│   └── __init__.py
-├── utils/
-│   ├── indicators.py      # Technical indicators
-│   ├── helpers.py         # Utility functions
-│   ├── multi_timeframe.py # Multi-timeframe analysis
-│   └── __init__.py
-└── models/                # Trained ML models (generated)
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/new-strategy`
-3. Commit changes: `git commit -am 'Add new strategy'`
-4. Push to branch: `git push origin feature/new-strategy`
-5. Submit a pull request
-
-### Adding New Strategies
-1. Create new strategy class inheriting from base strategy
-2. Implement `calculate_signal()` method
-3. Add to multi-strategy engine with appropriate weights
-4. Update configuration if needed
-
-### Adding New Indicators
-1. Add calculation to `utils/indicators.py`
-2. Update feature lists in ML modules
-3. Test with existing strategies
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## ⚠️ Disclaimer
-
-This software is for educational and testing purposes only. Cryptocurrency trading involves significant risk of loss. Never trade with money you cannot afford to lose. Always test thoroughly on testnet before considering live trading.
-
-The authors and contributors are not responsible for any financial losses incurred through the use of this software.
-
-## 📞 Support
-
-For questions or issues:
-1. Check the troubleshooting section above
-2. Review Binance API documentation
-3. Open an issue on GitHub with detailed error logs
+![React](https://img.shields.io/badge/React-18.3-61dafb?style=flat-square&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178c6?style=flat-square&logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8?style=flat-square&logo=tailwindcss)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi)
 
 ---
 
-**Version:** 0.2  
-**Last Updated:** October 2025  
-**Python Version:** 3.8+  
-**Testnet Only:** Yes
+## 📖 About The Project
+
+TradeBot is an advanced algorithmic trading system utilizing Machine Learning (Random Forest, XGBoost, TensorFlow) and Reinforcement Learning to trade crypto assets on testnets.
+
+This **Frontend Dashboard** serves as the control center, allowing you to:
+- 🟢 **Start/Stop** the bot in various modes (Live, Simple Backtest, Enhanced ML Backtest, Train).
+- 📊 **Monitor** real-time performance metrics, equity curves, and open positions.
+- ⚙️ **Configure** trading parameters, ML hyperparameters, and per-symbol risk settings on the fly.
+- 📜 **View** live, color-coded streaming logs via WebSocket.
+- 🧪 **Trigger** backtests and view detailed performance reports (Sharpe Ratio, Max Drawdown, Win Rate).
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **State & Data**: React Hooks, Axios, Recharts (for charts), Lucide React (for icons)
+
+### Backend (TradeBot)
+- **Framework**: FastAPI (Python 3.10+)
+- **ML/Data**: Pandas, Scikit-Learn, TensorFlow, XGBoost, CCXT
+- **Server**: Uvicorn (ASGI)
+
+---
+
+## 📋 Prerequisites
+
+Before running the project, ensure you have the following installed on your system:
+
+1. **Python 3.10+**
+2. **Node.js 18+** and **npm** (LTS recommended)
+3. **Python Virtual Environment** (Recommended)
+
+Verify installations:
+```bash
+python3 --version
+node --version
+npm --version
+```
+
+---
+
+## ⚡ Quick Start (TL;DR)
+
+If you already have dependencies installed, open **two separate terminals**:
+
+**Terminal 1 (Backend):**
+```bash
+cd path/to/TradeBot
+source path/to/your/venv/bin/activate
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Terminal 2 (Frontend):**
+```bash
+cd path/to/TradeBot/frontend
+npm run dev
+```
+Open your browser to: **http://localhost:3000**
+
+---
+
+## 📦 Detailed Installation & Setup
+
+### Step 1: Install Backend Dependencies
+Navigate to your project directory, activate your virtual environment, and install required Python packages:
+```bash
+cd path/to/TradeBot
+source path/to/your/venv/bin/activate
+
+pip install numpy pandas ccxt scikit-learn matplotlib shap imblearn tensorflow xgboost fastapi uvicorn
+```
+
+### Step 2: Install Frontend Dependencies
+Navigate to the frontend folder and install Node packages:
+```bash
+cd path/to/TradeBot/frontend
+npm install
+```
+*(This installs React, Vite, Tailwind, Recharts, Axios, and all necessary dev dependencies).*
+
+---
+
+## 🚀 How to Run the Project
+
+You **must** run the backend and frontend simultaneously in **two separate terminal windows**.
+
+### Terminal 1: Start the FastAPI Backend
+```bash
+# 1. Navigate to the project root
+cd path/to/TradeBot
+
+# 2. Activate the virtual environment
+source path/to/your/venv/bin/activate
+
+# 3. Start the server (using python -m ensures the correct venv is used)
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+✅ *Success looks like:* `INFO: Application startup complete.`
+
+### Terminal 2: Start the React Frontend
+```bash
+# 1. Navigate to the frontend directory
+cd path/to/TradeBot/frontend
+
+# 2. Start the Vite development server
+npm run dev
+```
+✅ *Success looks like:* `Local: http://localhost:3000/`
+
+### Step 3: Access the Dashboard
+Open your web browser and go to: **http://localhost:3000**
+
+---
+
+## 📁 Project Structure
+
+```text
+TradeBot/
+├── api/                          # FastAPI Backend
+│   ├── main.py                   # App entry point & route definitions
+│   └── ...
+├── core/                         # Core trading logic
+├── ml/                           # Machine Learning models & training
+├── frontend/                     # 🌐 REACT FRONTEND (This Project)
+│   ├── src/
+│   │   ├── api/                  # Axios API client & endpoints
+│   │   ├── components/           # Reusable UI components
+│   │   │   ├── Layout/           # Sidebar, Header, Main Layout
+│   │   │   ├── Dashboard/        # Status cards, Metrics, Equity Chart
+│   │   │   ├── Bot/              # Start/Stop controls, Status display
+│   │   │   ├── Config/           # Settings editor (Trade, ML, Symbols)
+│   │   │   ├── Positions/        # Live open positions table
+│   │   │   ├── Backtest/         # Backtest triggers & results
+│   │   │   ├── Reports/          # Performance analytics
+│   │   │   └── Logs/             # Real-time WebSocket log viewer
+│   │   ├── hooks/                # Custom hooks (useWebSocket, useBotStatus)
+│   │   ├── types/                # TypeScript interfaces
+│   │   ├── pages/                # Page-level components (Dashboard, Bot, etc.)
+│   │   ├── styles/               # Global CSS & Tailwind imports
+│   │   ├── App.tsx               # Main routing setup
+│   │   └── main.tsx              # React entry point
+│   ├── index.html                # HTML template
+│   ├── package.json              # Node dependencies
+│   ├── vite.config.ts            # Vite config (includes API proxy)
+│   ├── tailwind.config.js        # Tailwind CSS config
+│   └── tsconfig.json             # TypeScript config
+└── requirements.txt              # Python dependencies
+```
+
+---
+
+## 🔌 API & WebSocket Endpoints
+
+The frontend communicates with the backend via Vite's built-in proxy (`/api` → `http://localhost:8000`).
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/bot/start` | Start bot (payload: `{ mode: 'live' \| 'simple' \| 'enhanced' \| 'train' }`) |
+| `POST` | `/bot/stop` | Stop the running bot |
+| `GET` | `/bot/status` | Get current bot status, PID, and uptime |
+| `GET` | `/config` | Fetch current trading and ML configuration |
+| `PUT` | `/config` | Update configuration parameters |
+| `GET` | `/positions` | Get list of currently open positions |
+| `POST` | `/backtest/simple` | Trigger a simple backtest job |
+| `POST` | `/backtest/enhanced` | Trigger an ML-enhanced backtest job |
+| `GET` | `/backtest/result` | Fetch results of the last backtest job |
+| `GET` | `/reports/latest` | Get latest performance report metrics |
+| `GET` | `/chart/equity` | Get historical equity curve data |
+| `WS` | `/ws/logs` | **WebSocket**: Stream live bot logs in real-time |
+
+---
+
+## 🐛 Troubleshooting
+
+### 1. `ModuleNotFoundError: No module named 'fastapi'`
+**Cause:** The system is using the global Python installation instead of your virtual environment.
+**Fix:** Always activate the venv and use `python -m`:
+```bash
+source path/to/your/venv/bin/activate
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 2. Frontend shows "Unexpected token" or Babel parsing errors
+**Cause:** Template literals (`` ` ``) or variables (`${}`) were accidentally escaped during file generation.
+**Fix:** Ensure your `.tsx` files do not contain `\`` or `\${`. If you used an automated script to generate files, run a find-and-replace in your IDE to remove the backslashes before backticks and dollar signs.
+
+### 3. Frontend shows "No data" or Network Errors
+**Cause:** The frontend cannot reach the backend.
+**Fix:**
+1. Verify the backend is running: `curl http://localhost:8000/bot/status`
+2. Check the browser console (F12) for CORS or 404 errors.
+3. Ensure `vite.config.ts` has the correct proxy settings pointing to `http://localhost:8000`.
+
+### 4. Port 3000 or 8000 is already in use
+**Fix:** Kill the process or use a different port.
+```bash
+# Kill process on port 3000 (Linux/Mac)
+lsof -ti:3000 | xargs kill -9
+
+# Or run frontend on a different port
+npm run dev -- --port 3001
+```
+
+---
+
+## 💻 Development & Building
+
+### Available NPM Scripts
+```bash
+npm run dev      # Start local development server with Hot Module Replacement (HMR)
+npm run build    # Compile TypeScript and bundle for production (outputs to /dist)
+npm run preview  # Locally preview the production build
+```
+
+### Adding a New Feature
+1. **New Page:** Create `src/pages/NewPage.tsx`, add it to `src/App.tsx` routes, and add a link in `src/components/Layout/Sidebar.tsx`.
+2. **New API Call:** Add the endpoint function in `src/api/client.ts` and define its return type in `src/types/index.ts`.
+
+---
+
+## 📝 Notes
+- The Vite proxy (`vite.config.ts`) automatically handles CORS during development. Do not call `http://localhost:8000` directly from React; use `/api/...` so the proxy forwards it correctly.
+- The dashboard polls `/bot/status` every 5 seconds and `/positions` every 10 seconds to keep the UI fresh.
+- Logs are streamed via WebSocket for zero-latency updates.
+
+---
+
+**Happy Algorithmic Trading! 📈🤖**
