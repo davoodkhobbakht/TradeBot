@@ -38,6 +38,12 @@ A modern, responsive web interface to monitor and control your trading bot in re
 - Model training pipeline with cross-validation
 - Confidence-weighted signal combination
 
+### Multi-Exchange Data Fetcher
+- **5-exchange fallback** (Binance → Bybit → OKX → Kraken)
+- **Auto-retry** with 3 attempts per symbol
+- **Source tracking** - know which exchange provided each candle
+- **Cloudflare bypass** with browser headers
+
 ### Advanced Signal Generation
 - Market regime detection (trending bull/bear, ranging, high volatility)
 - Strategy weight adjustment based on market conditions
@@ -318,6 +324,8 @@ testnet trader V0.2/
 ```
 
 ## 🐛 Troubleshooting
+#### "Cloudflare" or connection errors
+**Fix:** Multi-exchange fallback enabled by default - auto-switches to Bybit/OKX if Binance fails.
 
 ### Backend Issues
 
@@ -421,3 +429,4 @@ For questions or issues:
 **Node.js Version:** 18+
 **Testnet Only:** Yes
 **Web Dashboard:** ✅ Included
+- 🔄 **Multi-Exchange Data Fetching**: Automatic fallback between 5 exchanges (Binance Futures, Binance Spot, Bybit, OKX, Kraken) with Cloudflare bypass for reliable data collection
