@@ -46,16 +46,18 @@ class BotManager:
         if not self.process:
             return {"status": "not_running"}
 
-        if platform.system() == "Windows":
+        if self.process.poll() is not None:
+            self.process = None
+            return {"status": "already_stopped"}
+
+        try:
             self.process.terminate()
-        else:
-            os.kill(self.process.pid, signal.SIGTERM)
+            self.process.wait(timeout=5)
 
-        self.process = None
-        return {"status": "stopped"}
+        except subprocess.TimeoutExpired:
+            self.process.kill()
 
-    def status(self):
-        if self.process and self.process.poll() is None:
-            return {"status": "running", "pid": self.process.pid}
+        finally:
+            self.process = None
 
         return {"status": "stopped"}
