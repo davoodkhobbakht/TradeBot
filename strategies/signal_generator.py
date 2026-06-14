@@ -30,6 +30,8 @@ def enhanced_signal_generation(
 
     if verbose:
         print(f"\n🔍 Generating signals for {display_symbol}...")
+    from utils.indicators import calculate_indicators
+    df = calculate_indicators(df)
 
     # Base signals first
     df = generate_signals(df)

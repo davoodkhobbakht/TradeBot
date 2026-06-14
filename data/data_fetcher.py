@@ -186,8 +186,11 @@ class DataFetcher:
                 bb_middle REAL,
                 bb_lower REAL,
                 sma_20 REAL,
+                sma_50 REAL,
+                sma_200 REAL,
                 ema_12 REAL,
                 ema_26 REAL,
+                
                 source_exchange TEXT
             )
         """
@@ -274,7 +277,7 @@ class DataFetcher:
         required_columns = [
             "rsi", "macd", "macd_signal", "macd_histogram",
             "bb_upper", "bb_middle", "bb_lower",
-            "sma_20", "ema_12", "ema_26"
+             "sma_20", "sma_50", "sma_200", "ema_12", "ema_26"
         ]
         
         for col in required_columns:
@@ -347,6 +350,14 @@ class DataFetcher:
             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
             df.set_index("timestamp", inplace=True)
             df = calculate_indicators(df)
+            
+            if "SMA_20" not in df.columns:
+                df["SMA_20"] = df["close"].rolling(window=20).mean()
+            if "SMA_50" not in df.columns:
+                df["SMA_50"] = df["close"].rolling(window=50).mean()
+            if "SMA_200" not in df.columns:
+                df["SMA_200"] = df["close"].rolling(window=200).mean()
+                
             df.reset_index(inplace=True)
             df["timestamp"] = df["timestamp"].astype("int64") // 10**6
             df["source_exchange"] = used_exchange
@@ -404,7 +415,7 @@ class DataFetcher:
     ):
         """Main function – download/update multiple symbols & timeframes with fallback"""
         if timeframes is None:
-            timeframes = ["5m", "15m", "30m", "1h", "4h"]
+            timeframes = ["5m", "15m", "30m", "1h", "4h","1d"]
         
         since = int(pd.Timestamp(start_date).timestamp() * 1000)
         
