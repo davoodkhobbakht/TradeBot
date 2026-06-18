@@ -225,22 +225,25 @@ def train_ml_models(
         _log(f"❌ Unexpected error: {e}", "critical")
         return None
 
-
 def enhanced_backtest(
     symbols: List[str],
     ml_models: Optional[Dict] = None,
     initial_capital: float = 1000.0,
     logger_callback: Optional[Callable[[str], None]] = None,
+    use_kelly: bool = True,
+    use_volatility_sizing: bool = True,
 ) -> Dict[str, Any]:
     """
-    Advanced backtest with ML signal generation.
-    
+    Advanced backtest with ML signal generation and comprehensive metrics
+
     Args:
         symbols: Trading symbols
         ml_models: Pre-trained ML models dict
         initial_capital: Starting capital
         logger_callback: Optional progress logger
-    
+        use_kelly: Enable Kelly Criterion position sizing
+        use_volatility_sizing: Enable volatility-based position sizing
+
     Returns:
         Dict with enhanced backtest results per symbol
     """
@@ -251,10 +254,12 @@ def enhanced_backtest(
             logger.info(msg)
 
     from strategies.signal_generator import enhanced_signal_generation
-    from backtest.backtester import run_backtest
+    from backtest.backtester import EnhancedBacktester
     from backtest.performance import analyze_performance
 
     _log("🎯 Starting enhanced backtest with ML...")
+    _log(f"💡 Features: Kelly={use_kelly}, Volatility Sizing={use_volatility_sizing}")
+
     results = {}
     capital_per_symbol = initial_capital / len(symbols)
 
@@ -262,7 +267,7 @@ def enhanced_backtest(
     _log("📥 Fetching historical data...")
     fetcher = DataFetcher()
     fetcher.fetch_multiple_symbols_data(symbols)
-    
+
     symbols_data = {}
     for symbol in symbols:
         df = fetcher.get_stored_data(symbol, "1d")
@@ -273,25 +278,41 @@ def enhanced_backtest(
         _log("❌ No data received!")
         return results
 
+    # Initialize enhanced backtester
+    backtester = EnhancedBacktester(capital_per_symbol)
+
     for symbol, df in symbols_data.items():
-        _log(f"\n{'='*60}\n🚀 Advanced analysis: {symbol}\n{'='*60}")
+        _log(f"\n{'='*70}")
+        _log(f"🚀 Advanced analysis: {symbol}")
+        _log(f"{'='*70}")
 
         # Generate signals
         _log("🔍 Generating advanced signals...")
         df = enhanced_signal_generation(df, symbol, ml_models, None)
 
-        # Run backtest
-        _log("⚡ Running backtest...")
-        trades, equity_curve, final_capital, final_position = run_backtest(df, capital_per_symbol)
+        # Extract signal confidence if available
+        signal_confidence = None
+        if "ml_confidence" in df.columns:
+            signal_confidence = df["ml_confidence"].values
 
-        # Analyze
+        # Run enhanced backtest
+        _log("⚡ Running enhanced backtest...")
+        trades, equity_curve, final_capital, final_position, metrics = backtester.run_backtest(
+            df,
+            capital_per_symbol,
+            use_kelly=use_kelly,
+            use_volatility_sizing=use_volatility_sizing,
+            signal_confidence=signal_confidence
+        )
+
+        # Comprehensive performance analysis
         if len(trades) > 0:
             if final_position > 0 and len(df) > 0:
                 final_value = final_capital + (final_position * df["close"].iloc[-1])
             else:
                 final_value = final_capital
 
-            total_return, max_drawdown = analyze_performance(
+            total_return, max_drawdown, full_metrics = analyze_performance(
                 trades, equity_curve, capital_per_symbol, final_value, df
             )
 
@@ -301,14 +322,45 @@ def enhanced_backtest(
                 "trades": trades,
                 "final_value": float(final_value),
                 "num_trades": len([t for t in trades if t[0] == "BUY"]),
-                "equity_curve": equity_curve.tolist() if hasattr(equity_curve, 'tolist') else equity_curve,
+                "equity_curve": equity_curve.tolist() if hasattr(equity_curve, 'tolist') else list(equity_curve),
+                "metrics": full_metrics,
                 "symbol": symbol,
             }
-            _log(f"✅ {symbol}: Return {total_return:+.2f}% | Trades: {len(trades)}")
+
+            _log(f"\n✅ {symbol} Summary:")
+            _log(f"   Return: {total_return:+.2f}%")
+            _log(f"   Trades: {full_metrics['num_trades']}")
+            _log(f"   Win Rate: {full_metrics['win_rate']:.1f}%")
+            _log(f"   Sharpe: {full_metrics['sharpe_ratio']:.2f}")
+            _log(f"   Max DD: {full_metrics['max_drawdown']:.2f}%")
         else:
             _log(f"⚠️ No trades executed for {symbol}")
 
-    _log("✅ Enhanced backtest completed")
+    # Portfolio summary
+    if results:
+        _log(f"\n{'='*70}")
+        _log("📊 PORTFOLIO SUMMARY")
+        _log(f"{'='*70}")
+
+        total_final = sum(res["final_value"] for res in results.values())
+        portfolio_return = (total_final - initial_capital) / initial_capital * 100
+        total_trades = sum(res["num_trades"] for res in results.values())
+
+        _log(f"💰 Initial Capital: {initial_capital:,.0f} USDT")
+        _log(f"💰 Final Value: {total_final:,.0f} USDT")
+        _log(f"📈 Portfolio Return: {portfolio_return:+.2f}%")
+        _log(f"🔢 Total Trades: {total_trades}")
+
+        # Best/worst performers
+        sorted_results = sorted(results.items(), key=lambda x: x[1]["total_return"], reverse=True)
+
+        _log(f"\n🏆 Symbol Ranking:")
+        for i, (symbol, res) in enumerate(sorted_results, 1):
+            icon = "🟢" if res["total_return"] > 0 else "🔴"
+            _log(f"{i}. {icon} {symbol}: {res['total_return']:+.1f}% "
+                f"(Trades: {res['num_trades']}, Sharpe: {res['metrics']['sharpe_ratio']:.2f})")
+
+    _log("\n✅ Enhanced backtest completed")
     return results
 
 
