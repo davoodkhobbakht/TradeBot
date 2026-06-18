@@ -1,89 +1,68 @@
-import ccxt
-import pandas as pd
-import sqlite3
+# -*- coding: utf-8 -*-
+"""
+Data Fetcher with Yahoo Finance as Primary Source & Auto Indicator Generation
+"""
+
 import os
-from datetime import datetime
-from typing import List, Optional, Dict, Any
 import time
-from utils.indicators import calculate_indicators
+import pandas as pd
+import numpy as np
+from typing import List, Dict, Optional
+from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+
+try:
+    import ccxt
+except ImportError:
+    logger.error("ccxt not installed. Run: pip install ccxt")
+    ccxt = None
+
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    logger.warning("yfinance not installed. Run: pip install yfinance")
+
 
 class DataFetcher:
-    def __init__(self, db_path: str = "crypto_data.db", use_fallback: bool = True):
-        self.db_path = db_path
-        self.use_fallback = use_fallback
-        
-        # Configure exchanges in order of preference
-        self.exchanges = self._initialize_exchanges()
-        self.current_exchange_idx = 0
-        self.exchange = self.exchanges[0]  # Start with primary exchange
-        
-        self._init_db()
-    
+    """
+    Fetches historical data with Yahoo Finance as PRIMARY source.
+    Automatically calculates technical indicators required by ML models.
+    """
+
+    def __init__(self, data_dir: str = "data/cache", use_exchanges: bool = False):
+        self.data_dir = data_dir
+        os.makedirs(data_dir, exist_ok=True)
+
+        self.exchanges = []
+        if use_exchanges and ccxt:
+            print("🔄 Initializing CCXT exchanges as fallback...")
+            self.exchanges = self._initialize_exchanges()
+        else:
+            print("✅ Using Yahoo Finance as primary data source")
+
+        self.data_cache = {}
+
     def _initialize_exchanges(self) -> List:
-        """Initialize exchanges with Cloudflare bypass and proper headers"""
         exchanges = []
-        
-        # Common headers to mimic browser requests
         common_headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
         }
-        
-        # Primary: Binance Futures (with proxy support option)
-        try:
-            binance = ccxt.binance({
-                "enableRateLimit": True,
-                "options": {
-                    "defaultType": "future",
-                    "adjustForTimeDifference": True,
-                },
-                "timeout": 30000,
-                "headers": common_headers,
-                # Add proxy if needed: "proxy": "http://your-proxy:port",
-            })
-            # Force load markets to catch connection issues early
-            binance.load_markets()
-            exchanges.append(binance)
-            print("✅ Binance Futures configured")
-        except Exception as e:
-            print(f"⚠️ Binance Futures config error: {e}")
-        
-        # Fallback 1: Binance Spot
-        try:
-            binance_spot = ccxt.binance({
-                "enableRateLimit": True,
-                "options": {
-                    "defaultType": "spot",
-                    "adjustForTimeDifference": True,
-                },
-                "timeout": 30000,
-                "headers": common_headers,
-            })
-            binance_spot.load_markets()
-            exchanges.append(binance_spot)
-            print("✅ Binance Spot configured")
-        except Exception as e:
-            print(f"⚠️ Binance Spot config error: {e}")
-        
-        # Fallback 2: Bybit (use v5 API properly)
+
         try:
             bybit = ccxt.bybit({
                 "enableRateLimit": True,
-                "options": {
-                    "defaultType": "linear",
-                    "warnOnFetchOpenOrdersWithoutSymbol": False,
-                },
-                "timeout": 30000,
-                "headers": common_headers,
+                "options": {"defaultType": "swap", "defaultSubType": "linear"},
+                "timeout": 30000, "headers": common_headers,
             })
             bybit.load_markets()
             exchanges.append(bybit)
+<<<<<<< HEAD
             print("✅ Bybit configured")
         except Exception as e:
             print(f"⚠️ Bybit config error: {e}")
@@ -464,25 +443,264 @@ class DataFetcher:
     
     def close(self):
         pass
+=======
+        except Exception: pass
+>>>>>>> aea1e5a (data fetching from yfinance)
 
-# Quick test
-if __name__ == "__main__":
-    # Test with fallback enabled
-    fetcher = DataFetcher(use_fallback=True)
-    symbols = ["BTC/USDT", "ETH/USDT"]
-    
-    # This will automatically use fallback if Binance fails
-    fetcher.fetch_multiple_symbols_data(
-        symbols, timeframes=["1h"], start_date="2025-01-01T00:00:00Z"
-    )
-    
-    # Check which exchanges provided the data
-    for symbol in symbols:
-        info = fetcher.get_data_source_info(symbol, "1h")
-        print(f"\n📊 {symbol} data sources:")
-        for exchange, details in info.items():
-            print(f"   {exchange}: {details['candles']} candles")
-    
-    # Load data as usual (no changes needed to existing code)
-    df = fetcher.get_stored_data("BTC/USDT", "1h")
-    print(f"\n✅ Loaded BTC/USDT 1h data: {len(df)} rows")
+        try:
+            binance = ccxt.binance({
+                "enableRateLimit": True,
+                "options": {"defaultType": "future", "adjustForTimeDifference": True},
+                "timeout": 30000, "headers": common_headers,
+            })
+            binance.load_markets()
+            exchanges.append(binance)
+        except Exception: pass
+
+        if not exchanges:
+            print("⚠️ No CCXT exchanges available. Yahoo Finance only.")
+        return exchanges
+
+    def _convert_symbol_for_yahoo(self, symbol: str) -> str:
+        base = symbol.split('/')[0]
+        return f"{base}-USD"
+
+    def _get_yahoo_period_and_interval(self, timeframe: str) -> tuple:
+        mapping = {
+            '1m': ('7d', '1m'), '5m': ('60d', '5m'), '15m': ('60d', '15m'),
+            '30m': ('60d', '30m'), '1h': ('730d', '1h'),
+            '4h': ('730d', '1h'), '1d': ('max', '1d'), '1w': ('max', '1wk'),
+        }
+        return mapping.get(timeframe, ('max', '1d'))
+
+    def _parse_date(self, date_str) -> str:
+        if not date_str: return None
+        if isinstance(date_str, str):
+            return date_str.replace('Z', '').split('T')[0]
+        return str(date_str)
+
+    def add_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Calculate technical indicators required by ML models, RL, and Validation"""
+        df = df.copy()
+
+        # 1. RSI (14)
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+
+        # 2. MACD (12, 26, 9)
+        exp1 = df['close'].ewm(span=12, adjust=False).mean()
+        exp2 = df['close'].ewm(span=26, adjust=False).mean()
+        df['MACD'] = exp1 - exp2
+        df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+
+        # Alias for base_strategy.py
+        df['Signal_Line'] = df['MACD_Signal']
+
+        # 3. Simple Moving Averages
+        df['SMA_20'] = df['close'].rolling(window=20).mean()
+        df['SMA_50'] = df['close'].rolling(window=50).mean()
+        df['SMA_200'] = df['close'].rolling(window=200).mean()
+
+        # 4. Bollinger Bands (20, 2)
+        df['BB_Middle'] = df['close'].rolling(window=20).mean()
+        bb_std = df['close'].rolling(window=20).std()
+        df['BB_Upper'] = df['BB_Middle'] + (bb_std * 2)
+        df['BB_Lower'] = df['BB_Middle'] - (bb_std * 2)
+        df['BB_Bandwidth'] = (df['BB_Upper'] - df['BB_Lower']) / df['BB_Middle']
+
+        # 5. ATR (14)
+        high_low = df['high'] - df['low']
+        high_close = np.abs(df['high'] - df['close'].shift())
+        low_close = np.abs(df['low'] - df['close'].shift())
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = np.max(ranges, axis=1)
+        df['atr_14'] = true_range.rolling(14).mean()
+
+        # Alias for multi_strategy.py
+        df['ATR'] = df['atr_14']
+
+        # 6. ADX (14)
+        high, low, close = df['high'], df['low'], df['close']
+        tr1 = pd.DataFrame({
+            'hl': high - low,
+            'hc': abs(high - close.shift(1)),
+            'lc': abs(low - close.shift(1))
+        }).max(axis=1)
+
+        up = high.diff()
+        down = low.diff()
+        plus_dm = np.where((up > down) & (up > 0), up, 0.0)
+        minus_dm = np.where((down > up) & (down > 0), down, 0.0)
+
+        plus_di = 100 * (pd.Series(plus_dm, index=df.index).rolling(14).mean() / tr1.rolling(14).mean())
+        minus_di = 100 * (pd.Series(minus_dm, index=df.index).rolling(14).mean() / tr1.rolling(14).mean())
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+        df['ADX'] = dx.rolling(14).mean()
+
+        # 7. Stochastic Oscillator (14, 3) - 🌟 ADDED FOR MOMENTUM STRATEGY
+        low_14 = df['low'].rolling(window=14).min()
+        high_14 = df['high'].rolling(window=14).max()
+        df['stoch_k'] = 100 * (df['close'] - low_14) / (high_14 - low_14)
+        df['stoch_d'] = df['stoch_k'].rolling(window=3).mean()
+
+        # Fill NaN values created by rolling windows
+        df = df.ffill().bfill()
+
+        return df
+
+    def fetch_from_yahoo_finance(self, symbol: str, timeframe: str = "1d", **kwargs) -> pd.DataFrame:
+        if not YFINANCE_AVAILABLE:
+            print("⚠️ yfinance is not installed. Cannot fetch data.")
+            return pd.DataFrame()
+
+        try:
+            yahoo_symbol = self._convert_symbol_for_yahoo(symbol)
+            start_date = kwargs.get('start_date', None)
+            clean_start_date = self._parse_date(start_date)
+
+            ticker = yf.Ticker(yahoo_symbol)
+            yf_interval = '1h' if timeframe == '4h' else timeframe
+
+            yf_limits = {
+                '1m': 7, '2m': 60, '5m': 60, '15m': 60, '30m': 60,
+                '60m': 730, '1h': 730, '1d': 99999, '1wk': 99999
+            }
+            max_days = yf_limits.get(yf_interval, 99999)
+
+            use_period = False
+            period_to_use = "max"
+
+            if clean_start_date:
+                try:
+                    start_dt = pd.to_datetime(clean_start_date)
+                    if start_dt.tzinfo:
+                        start_dt = start_dt.tz_localize(None)
+                    now = pd.Timestamp.now()
+                    days_diff = (now - start_dt).days
+
+                    if days_diff > max_days:
+                        use_period = True
+                        if yf_interval in ['1m']: period_to_use = '7d'
+                        elif yf_interval in ['5m', '15m', '30m']: period_to_use = '60d'
+                        elif yf_interval in ['1h']: period_to_use = '730d'
+                        else: period_to_use = 'max'
+                except Exception:
+                    pass
+
+            if use_period:
+                print(f"⚠️ Yahoo Finance only keeps {period_to_use} of {yf_interval} data. Fetching maximum available...")
+                df = ticker.history(period=period_to_use, interval=yf_interval)
+            elif clean_start_date:
+                print(f"📥 Fetching {yahoo_symbol} from Yahoo Finance (start={clean_start_date})...")
+                df = ticker.history(start=clean_start_date, interval=yf_interval)
+            else:
+                period, interval = self._get_yahoo_period_and_interval(timeframe)
+                print(f"📥 Fetching {yahoo_symbol} from Yahoo Finance (period={period}, interval={interval})...")
+                df = ticker.history(period=period, interval=interval)
+
+            if df.empty:
+                print(f"⚠️ No data from Yahoo Finance for {yahoo_symbol}")
+                return pd.DataFrame()
+
+            df = df.rename(columns={
+                'Open': 'open', 'High': 'high', 'Low': 'low',
+                'Close': 'close', 'Volume': 'volume'
+            })
+            df = df[['open', 'high', 'low', 'close', 'volume']]
+            df.index = pd.to_datetime(df.index).tz_localize(None)
+            df.index.name = 'timestamp'
+
+            if timeframe == '4h':
+                df = df.resample('4h').agg({
+                    'open': 'first', 'high': 'max', 'low': 'min',
+                    'close': 'last', 'volume': 'sum'
+                }).dropna()
+
+            # 🌟 CRITICAL FIX: Add technical indicators before caching!
+            df = self.add_technical_indicators(df)
+
+            print(f"✅ Fetched {len(df)} candles with indicators for {symbol}")
+            return df
+
+        except Exception as e:
+            print(f"⚠️ Yahoo Finance error for {symbol}: {e}")
+            return pd.DataFrame()
+
+    def fetch_ohlcv(self, symbol: str, timeframe: str = "1d", limit: int = 1000, max_retries: int = 3, **kwargs) -> pd.DataFrame:
+        cached = self.get_stored_data(symbol, timeframe)
+        # Check if cached data has indicators (e.g., 'RSI' column)
+        if not cached.empty and 'RSI' in cached.columns and len(cached) >= limit * 0.8:
+            print(f"💾 Using cached data for {symbol} ({timeframe}) - {len(cached)} candles")
+            return cached.tail(limit)
+
+        print(f"🌐 Fetching data for {symbol} ({timeframe})...")
+
+        df = self.fetch_from_yahoo_finance(symbol, timeframe, **kwargs)
+        if not df.empty:
+            self._store_data(symbol, timeframe, df)
+            return df
+
+        if not self.exchanges:
+            self.exchanges = self._initialize_exchanges()
+
+        if self.exchanges:
+            for exchange in self.exchanges:
+                try:
+                    ohlcv = exchange.fetch_ohlcv(symbol.replace('/', ''), timeframe, limit=limit)
+                    if ohlcv:
+                        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                        df.set_index('timestamp', inplace=True)
+                        df.index.name = 'timestamp'
+                        df = self.add_technical_indicators(df) # Add indicators for exchange data too
+                        self._store_data(symbol, timeframe, df)
+                        return df
+                except Exception:
+                    continue
+
+        raise Exception(f"❌ Could not fetch data for {symbol} ({timeframe}) from any source")
+
+    def fetch_multiple_symbols_data(self, symbols: List[str], timeframes: List[str] = None, limit: int = 1000, **kwargs):
+        if timeframes is None:
+            timeframes = ["1d", "4h", "1h"]
+
+        if "1d" not in timeframes:
+            timeframes.append("1d")
+            print("ℹ️ Automatically added '1d' to timeframes (required for ML training)")
+
+        print(f"\n📥 Fetching multi-timeframe historical data for {len(symbols)} symbols...")
+        print(f"   Timeframes to fetch: {timeframes}")
+
+        for symbol in symbols:
+            for timeframe in timeframes:
+                try:
+                    self.fetch_ohlcv(symbol, timeframe, limit, **kwargs)
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"❌ Failed to fetch data for {symbol} ({timeframe}): {e}")
+
+    def _get_cache_path(self, symbol: str, timeframe: str) -> str:
+        safe_symbol = symbol.replace("/", "_").replace(":", "_")
+        return os.path.join(self.data_dir, f"{safe_symbol}_{timeframe}.csv")
+
+    def _store_data(self, symbol: str, timeframe: str, df: pd.DataFrame):
+        try:
+            path = self._get_cache_path(symbol, timeframe)
+            df.to_csv(path)
+            print(f"💾 Cached {len(df)} candles with indicators for {symbol} ({timeframe})")
+        except Exception as e:
+            print(f"⚠️ Failed to cache data for {symbol}: {e}")
+
+    def get_stored_data(self, symbol: str, timeframe: str) -> pd.DataFrame:
+        try:
+            path = self._get_cache_path(symbol, timeframe)
+            if os.path.exists(path):
+                df = pd.read_csv(path, index_col=0, parse_dates=True)
+                df.index.name = 'timestamp'
+                return df
+        except Exception as e:
+            print(f"⚠️ Failed to load cached data for {symbol}: {e}")
+        return pd.DataFrame()
